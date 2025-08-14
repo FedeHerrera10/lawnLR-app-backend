@@ -16,48 +16,55 @@ import org.springframework.http.HttpStatus;
 import com.fedeherrera.vetapp.vetapp.services.auth.JwtService;
 import com.fedeherrera.vetapp.vetapp.services.user.UserService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOGoogleLoginRequest;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOResetPassword;
-
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-@Autowired
+    @Autowired
     private UserService service;
 
-@Autowired
+    @Autowired
     private JwtService jwtService;
-    
-@PostMapping("/google")
-public ResponseEntity<?> googleLogin(@RequestBody DTOGoogleLoginRequest request) {
-    
-    
-    
-    
-    if (service.saveGoogleUser(request.idToken()) != null){
-        String email = service.saveGoogleUser(request.idToken()).getEmail();
-        String token = jwtService.generateToken(email);
-        return ResponseEntity.ok(token);
-    }
-    
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login fallido.");
-}
 
-    @PutMapping(value="/confirm-account/{token}")
+    @Operation(summary = "Iniciar sesión con Google", description = "Autentica un usuario utilizando un token de Google.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Autenticación exitosa", content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas o error en la autenticación")
+    })
+    @PostMapping("/google")
+    public ResponseEntity<?> googleLogin(@RequestBody DTOGoogleLoginRequest request) {
+
+        if (service.saveGoogleUser(request.idToken()) != null) {
+            String email = service.saveGoogleUser(request.idToken()).getEmail();
+            String token = jwtService.generateToken(email);
+            return ResponseEntity.ok(token);
+        }
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login fallido.");
+    }
+
+    @PutMapping(value = "/confirm-account/{token}")
     public ResponseEntity<?> confirmUserAccount(@PathVariable String token) {
-       if(service.confirmAccount(token)){
-        return ResponseEntity.status(HttpStatus.OK).body("Cuenta Confirmada.");
-       }
-       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token de Google inválido");
+        if (service.confirmAccount(token)) {
+            return ResponseEntity.status(HttpStatus.OK).body("Cuenta Confirmada.");
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token de Google inválido");
     }
 
     @PutMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody DTOResetPassword dtoResetPassword) {
         boolean update = service.resetPassword(dtoResetPassword);
-        if(!update) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No se pudo actualizar la contraseña.");
+        if (!update)
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No se pudo actualizar la contraseña.");
         return ResponseEntity.status(200).body("Contraseña actualizada");
     }
 
@@ -66,6 +73,5 @@ public ResponseEntity<?> googleLogin(@RequestBody DTOGoogleLoginRequest request)
         service.newCode(requestBody.get("email"));
         return ResponseEntity.status(200).body("Codigo enviado , revise su mail.");
     }
-    
 
 }

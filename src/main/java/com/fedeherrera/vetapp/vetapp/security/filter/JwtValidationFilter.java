@@ -6,9 +6,9 @@ import static com.fedeherrera.vetapp.vetapp.security.TokenJwtConfig.PREFIX_TOKEN
 import static com.fedeherrera.vetapp.vetapp.security.TokenJwtConfig.SECRET_KEY;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -19,7 +19,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
-import com.fedeherrera.vetapp.vetapp.security.SimpleGrantedAuthorityJsonCreator;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.jsonwebtoken.Claims;
@@ -53,13 +53,7 @@ public class JwtValidationFilter extends BasicAuthenticationFilter {
             String usename = claims.getSubject();
             // String usename2 = (String) claims.get("username");
             Object authoritiesClaims = claims.get("authorities");
-
-            Collection<? extends GrantedAuthority> authorities = Arrays.asList(
-                    new ObjectMapper()
-                .addMixIn(SimpleGrantedAuthority.class, 
-                                    SimpleGrantedAuthorityJsonCreator.class)
-                .readValue(authoritiesClaims.toString().getBytes(), SimpleGrantedAuthority[].class)
-                );
+            Collection<? extends GrantedAuthority> authorities = extractAuthorities(authoritiesClaims);
 
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(usename, null, authorities);
             SecurityContextHolder .getContext().setAuthentication(authenticationToken);
@@ -74,5 +68,31 @@ public class JwtValidationFilter extends BasicAuthenticationFilter {
             response.setContentType(CONTENT_TYPE);
         }
     }
+
+    private Collection<SimpleGrantedAuthority> extractAuthorities(Object authoritiesClaims) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        Collection<SimpleGrantedAuthority> authorities;
+    
+        try {
+            List<Map<String, String>> rolesMap = mapper.readValue(
+                authoritiesClaims.toString(),
+                new TypeReference<List<Map<String, String>>>() {}
+            );
+            authorities = rolesMap.stream()
+                .map(m -> new SimpleGrantedAuthority(m.get("authority")))
+                .toList();
+        } catch (Exception e) {
+            List<String> roles = mapper.readValue(
+                authoritiesClaims.toString(),
+                new TypeReference<List<String>>() {}
+            );
+            authorities = roles.stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+        }
+    
+        return authorities;
+    }
+    
 
 }

@@ -92,7 +92,7 @@ protected void successfulAuthentication(HttpServletRequest request, HttpServletR
     List<String> rolesList = authResult.getAuthorities()
             .stream()
             .map(GrantedAuthority::getAuthority)
-            .collect(Collectors.toList());
+            .toList();
     
       // Resetear contador de intentos fallidos
       userRepository.findByUsername(username).ifPresent(u -> {
