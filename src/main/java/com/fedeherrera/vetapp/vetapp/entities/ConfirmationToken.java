@@ -1,5 +1,6 @@
 package com.fedeherrera.vetapp.vetapp.entities;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.Random;
 
@@ -11,8 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.Temporal;
-import jakarta.persistence.TemporalType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -31,8 +30,8 @@ public class ConfirmationToken {
     @Column(name="confirmation_token")
     private String confirmationToken;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createdDate;
+    @Column(nullable = false, updatable = false)
+private LocalDateTime createdDate = LocalDateTime.now();
 
     @OneToOne(targetEntity = User.class, fetch = FetchType.EAGER)
     @JoinColumn(nullable = false, name = "user_id")
@@ -40,7 +39,7 @@ public class ConfirmationToken {
 
     public ConfirmationToken(User user) {
         this.user = user;
-        createdDate = new Date();
+        createdDate = LocalDateTime.now();
         Random random = new Random();
         int numeroAleatorio = 100000 + random.nextInt(900000);
         confirmationToken = String.format("%06d", numeroAleatorio);

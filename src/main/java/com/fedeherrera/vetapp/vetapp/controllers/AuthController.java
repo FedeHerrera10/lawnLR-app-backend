@@ -8,8 +8,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 
@@ -22,8 +20,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
+import com.fedeherrera.vetapp.vetapp.dtos.enums.ConfirmationResult;
+import com.fedeherrera.vetapp.vetapp.dtos.request.DTOEmail;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOGoogleLoginRequest;
+import com.fedeherrera.vetapp.vetapp.dtos.request.DTOResetP;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOResetPassword;
+import com.fedeherrera.vetapp.vetapp.exceptions.EntityExistException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -52,25 +54,61 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login fallido.");
     }
 
+    @Operation(summary = "Confirmar cuenta", description = "Confirma la cuenta de un usuario utilizando un token de confirmación.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cuenta confirmada con éxito"),
+            @ApiResponse(responseCode = "401", description = "Token inválido o expirado"),
+            @ApiResponse(responseCode = "404", description = "Token no encontrado"),
+            @ApiResponse(responseCode = "500", description = "Error inesperado")
+    })
     @PutMapping(value = "/confirm-account/{token}")
     public ResponseEntity<?> confirmUserAccount(@PathVariable String token) {
-        if (service.confirmAccount(token)) {
-            return ResponseEntity.status(HttpStatus.OK).body("Cuenta Confirmada.");
-        }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token de Google inválido");
+       ConfirmationResult result = service.confirmAccount(token);
+        switch (result) {
+        case SUCCESS:
+            return ResponseEntity.ok("Cuenta confirmada con éxito.");
+        
+        case EXPIRED:
+            throw new EntityExistException("El token ha expirado, solicita uno nuevo.");
+        
+        case NOT_FOUND:
+            throw new EntityExistException("El token no es valido.");
+        default:
+            throw new EntityExistException("Error inesperado.");
+    }
     }
 
+    @Operation(summary = "Restablecer contraseña", description = "Restablece la contraseña de un usuario utilizando un token de confirmación.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Contraseña restablecida con éxito"),
+            @ApiResponse(responseCode = "400", description = "No se pudo actualizar la contraseña"),
+            @ApiResponse(responseCode = "500", description = "Error inesperado")
+    })
     @PutMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody DTOResetPassword dtoResetPassword) {
+    public ResponseEntity<?> resetPassword(@RequestBody DTOResetP dtoResetPassword) {
         boolean update = service.resetPassword(dtoResetPassword);
         if (!update)
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No se pudo actualizar la contraseña.");
         return ResponseEntity.status(200).body("Contraseña actualizada");
     }
 
+    @Operation(summary = "Generar nuevo codigo", description = "Genera un nuevo codigo de confirmacion para un usuario.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Codigo enviado, revise su mail."),
+    })
     @PostMapping("/new-code")
-    public ResponseEntity<?> generateNewCode(@RequestBody Map<String, String> requestBody) {
-        service.newCode(requestBody.get("email"));
+    public ResponseEntity<?> generateNewCode(@RequestBody DTOEmail dtoEmail) {
+        service.newCode(dtoEmail.getEmail());
+        return ResponseEntity.status(200).body("Codigo enviado , revise su mail.");
+    }
+
+    @Operation(summary = "Generar nuevo codigo", description = "Genera un nuevo codigo de confirmacion para un usuario.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Codigo enviado, revise su mail."),
+    })
+    @PostMapping("/new-code-for-change-password")
+    public ResponseEntity<?> generateNewCodeForChangePassword(@RequestBody DTOEmail dtoEmail) {
+        service.newCodeForChangePassword(dtoEmail.getEmail());
         return ResponseEntity.status(200).body("Codigo enviado , revise su mail.");
     }
 

@@ -14,6 +14,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -45,6 +46,10 @@ public class User extends Audit {
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<Role> roles = new HashSet<>();
+
+    private Long document;
+    
+    private Date birthdate;
 
     // Campos para seguridad y control de login
     private int failedLoginAttempts = 0;        // contador de intentos fallidos

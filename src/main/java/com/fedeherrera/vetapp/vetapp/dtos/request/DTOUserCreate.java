@@ -1,7 +1,12 @@
 package com.fedeherrera.vetapp.vetapp.dtos.request;
 
+import java.sql.Date;
+import java.util.Map;
+
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,14 +30,12 @@ public class DTOUserCreate {
     
     @NotBlank(message = "La contraseña no puede estar vacia!")
     private String password;
-    
-    private boolean enabled;
 
-    private boolean admin;
+    @Min(value = 10000000, message = "El documento debe tener al menos 8 digitos!")
+    private Long document;
 
-    private boolean cliente;
-
-    private boolean veterinario;
-
-    private boolean password_expired;
+    @NotNull(message = "La fecha de nacimiento no puede estar vacia!")
+    private Date birthdate;
+   // Roles opcionales
+   private Map<String, Boolean> roles;
 }

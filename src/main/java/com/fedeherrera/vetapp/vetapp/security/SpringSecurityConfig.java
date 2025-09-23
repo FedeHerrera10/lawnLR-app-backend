@@ -51,11 +51,15 @@ public class SpringSecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests((authz) -> authz
+                .requestMatchers("/swagger-ui/**").permitAll()
+                .requestMatchers("/v3/api-docs/**").permitAll()
+                .requestMatchers("/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/user/register").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/google").permitAll()
                 .requestMatchers(HttpMethod.PUT, "/api/auth/confirm-account/**").permitAll()
                 .requestMatchers(HttpMethod.PUT, "/api/auth/reset-password/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/new-code/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/auth/new-code-for-change-password/**").permitAll()
                 .anyRequest().authenticated())
                 .addFilter(new JwtAuthenticationFilter(authenticationManager() , userRepository))
                 .addFilter(new JwtValidationFilter(authenticationManager()))

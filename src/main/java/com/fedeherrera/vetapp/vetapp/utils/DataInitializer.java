@@ -8,9 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import com.fedeherrera.vetapp.vetapp.entities.Role;
-import com.fedeherrera.vetapp.vetapp.entities.Specialization;
 import com.fedeherrera.vetapp.vetapp.entities.User;
-import com.fedeherrera.vetapp.vetapp.repositories.SpecializationRepository;
 import com.fedeherrera.vetapp.vetapp.repositories.UserRepository;
 import com.fedeherrera.vetapp.vetapp.services.role.RoleService;
 @Component
@@ -25,8 +23,6 @@ public class DataInitializer implements CommandLineRunner{
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private SpecializationRepository specializationRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -44,7 +40,6 @@ public class DataInitializer implements CommandLineRunner{
         roleService.saveRole(veterinaryRole);
 
         initUsers();
-        initSpecializations();
     }
 
     private void initUsers() {
@@ -68,7 +63,7 @@ public class DataInitializer implements CommandLineRunner{
         clientUser.setEmail("celeste222@gmail.com");
         clientUser.setPassword(passwordEncoder.encode("12345678"));
         clientUser.setUsername("celeste123");
-        clientUser.setEnabled(false);
+        clientUser.setEnabled(true);
         clientUser.setPassword_expired(false);
         HashSet<Role> roles2 = new HashSet<>();
         roles2.add(roleService.findByName("ROLE_CLIENT").get());
@@ -76,22 +71,5 @@ public class DataInitializer implements CommandLineRunner{
         userRepository.save(clientUser);
     }
 
-    private void initSpecializations() {
-        initSpecialization("Cardiology");
-        initSpecialization("Dermatology");
-        initSpecialization("Oncology");
-        initSpecialization("Orthopedics");
-        initSpecialization("Surgery");
-        initSpecialization("Neurology");
-        initSpecialization("Ophthalmology");
-        initSpecialization("Radiology");
-        initSpecialization("Internal Medicine");
-        initSpecialization("Emergency");
-    }
-
-    private void initSpecialization(String name) {
-        Specialization specialization = new Specialization();
-        specialization.setName(name);
-        specializationRepository.save(specialization);
-    }
+    
 }   

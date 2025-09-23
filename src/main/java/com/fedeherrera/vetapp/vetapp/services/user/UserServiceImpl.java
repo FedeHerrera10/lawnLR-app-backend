@@ -1,19 +1,20 @@
 package com.fedeherrera.vetapp.vetapp.services.user;
 
+import com.fedeherrera.vetapp.vetapp.dtos.enums.ConfirmationResult;
+import com.fedeherrera.vetapp.vetapp.dtos.request.DTOResetP;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOResetPassword;
+import com.fedeherrera.vetapp.vetapp.dtos.request.DTOUserCreate;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOUserUpdate;
 import com.fedeherrera.vetapp.vetapp.dtos.response.DTOUserResponse;
-import com.fedeherrera.vetapp.vetapp.dtos.response.DTOVeterinaryInfo;
 import com.fedeherrera.vetapp.vetapp.entities.ConfirmationToken;
 import com.fedeherrera.vetapp.vetapp.entities.ImageProfile;
 import com.fedeherrera.vetapp.vetapp.entities.Role;
 import com.fedeherrera.vetapp.vetapp.entities.User;
-import com.fedeherrera.vetapp.vetapp.entities.VeterinaryInformation;
+import com.fedeherrera.vetapp.vetapp.exceptions.EntityExistException;
 import com.fedeherrera.vetapp.vetapp.repositories.ConfirmationTokenRepository;
 import com.fedeherrera.vetapp.vetapp.repositories.ImageProfileRepository;
 import com.fedeherrera.vetapp.vetapp.repositories.RoleRepository;
 import com.fedeherrera.vetapp.vetapp.repositories.UserRepository;
-import com.fedeherrera.vetapp.vetapp.repositories.VeterinaryInformationRepository;
 import com.fedeherrera.vetapp.vetapp.services.googleAuth.GoogleTokenVerifier;
 import com.fedeherrera.vetapp.vetapp.services.mail.EmailService;
 import com.fedeherrera.vetapp.vetapp.utils.MapperUtil;
@@ -21,6 +22,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 
 import jakarta.persistence.EntityNotFoundException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,8 +63,6 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private ImageProfileRepository imageProfileRepository;
 
-    @Autowired
-    private VeterinaryInformationRepository veterinaryInformationRepository;
 
     @Autowired
     private GoogleTokenVerifier googleTokenVerifier;
@@ -78,51 +79,70 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public DTOUserResponse save(User user) {
-        String passwordRaw = "";
+    public DTOUserResponse save(DTOUserCreate user) {
+        User userToSave = mapper.mapEntityToDto(user, User.class);
+        userToSave.setEmail(userToSave.getEmail().toLowerCase());
 
-        List<Role> roles = assignRoles(user, null);
-        user.setRoles(new HashSet<>(roles));
-        
-        if (isRoleClient(user) == false) {
-            user.setPassword_expired(false);
-            passwordRaw = user.getPassword();
-            user.setEnabled(true);
+        if (repository.existsByUsername(userToSave.getUsername())) {
+            throw new EntityExistException("El usuario ya existe.");
+        }
+        if (repository.existsByEmail(userToSave.getEmail())) {
+            throw new EntityExistException("El email ya está registrado.");
         }
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        
-        repository.save(user);
+        List<Role> roles = assignRoles(userToSave, user.getRoles());
+        userToSave.setRoles(new HashSet<>(roles));
 
-         ConfirmationToken oConfirmationToken = new ConfirmationToken(user);
-         confirmationTokenRepository.save(oConfirmationToken);
-         sendConfirmationEmail(user, oConfirmationToken, passwordRaw);
-         return mapper.mapEntityToDto(user, DTOUserResponse.class); 
-        
+        String rawPassword = user.getPassword();
+
+        if (!isRoleClient(userToSave)) {
+            // Admin o Veterinario
+            if (rawPassword == null || rawPassword.isEmpty()) {
+                throw new DataIntegrityViolationException("La contraseña no puede estar vacia!");
+            }
+            userToSave.setPassword_expired(true);
+            ;
+            userToSave.setEnabled(true);
+        } else {
+            // Cliente
+            userToSave.setPassword_expired(false);
+            userToSave.setEnabled(false); // espera confirmación
+        }
+
+        userToSave.setPassword(passwordEncoder.encode(rawPassword));
+        repository.save(userToSave);
+
+        // Generar token de confirmación solo si es cliente
+
+        ConfirmationToken token = new ConfirmationToken(userToSave);
+        confirmationTokenRepository.save(token);
+        sendConfirmationEmail(userToSave, token);
+
+        return mapper.mapEntityToDto(userToSave, DTOUserResponse.class);
     }
 
     @Override
     @Transactional
     public User saveGoogleUser(String idToken) {
         GoogleIdToken.Payload payload = googleTokenVerifier.verify(idToken);
-        if (payload == null) return null;
+        if (payload == null)
+            return null;
 
         String email = payload.getEmail();
         String firstname = (String) payload.get("given_name");
         String lastname = (String) payload.get("family_name");
 
-
         // Revisar si ya existe usuario
         User userFromGoogle = repository.findByEmailIgnoreCase(email);
-        
-        if(userFromGoogle == null){
+
+        if (userFromGoogle == null) {
             User u = new User();
             u.setEmail(email);
             u.setEnabled(true);
             u.setPassword_expired(false);
             u.setFirstname(firstname);
             u.setLastname(lastname);
-            List<Role> roles = assignRoles(u,Map.of("cliente", true));
+            List<Role> roles = assignRoles(u, Map.of("cliente", true));
             u.setRoles(new HashSet<>(roles));
             return repository.save(u);
         }
@@ -132,39 +152,45 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public DTOUserResponse getUserLogged() {
-        // Obtener la autenticación actual
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        Optional<User> optionalUser = null;
-        if(authentication ==null){
+
+        if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
-        // Extraer el username del usuario autenticado
+
         String username = authentication.getName();
-       optionalUser=Optional.ofNullable(repository.findByUsernameOrEmailIgnoreCase(username, username));
-        
-       return mapper.mapEntityToDto(optionalUser.get(), DTOUserResponse.class);
+
+        User user = repository.findByUsernameOrEmailIgnoreCase(username, username);
+        if (user == null) {
+            return null;
+        }
+
+        return mapper.mapEntityToDto(user, DTOUserResponse.class);
     }
 
     @Transactional
     @Override
-    public boolean resetPassword(DTOResetPassword dtoResetPassword) {
-        User user = repository.findByUsername(dtoResetPassword.getUsername()).orElseThrow(
-                () -> new EntityNotFoundException(USER_NOT_FOUND));
+    public boolean resetPassword(DTOResetP dtoResetP) {
+        User user = repository.findByEmailIgnoreCase(dtoResetP.getEmail());
+        if (user == null) {
+            throw new EntityNotFoundException(USER_NOT_FOUND);
+        }
         Long idUser = user.getId();
         confirmationTokenRepository.deleteAllByUser_Id(idUser);
-        user.setEnabled(false);
-        user.setPassword(passwordEncoder.encode(dtoResetPassword.getPassword()));
+        //user.setEnabled(false);
+        user.setPassword(passwordEncoder.encode(dtoResetP.getPassword()));
         repository.save(user);
 
-        ConfirmationToken oConfirmationToken = new ConfirmationToken(user);
-        confirmationTokenRepository.save(oConfirmationToken);
+        //ConfirmationToken oConfirmationToken = new ConfirmationToken(user);
+        //confirmationTokenRepository.save(oConfirmationToken);
 
-        sendResetPasswordEmail(user, oConfirmationToken);
+       // sendResetPasswordEmail(user, oConfirmationToken);
 
         return true;
     }
 
     @Override
+    @Transactional
     public boolean newCode(String email) {
         User user = repository.findByEmailIgnoreCase(email);
 
@@ -172,7 +198,23 @@ public class UserServiceImpl implements UserService {
             throw new EntityNotFoundException(USER_NOT_FOUND);
         }
 
+        if (user.isEnabled()) {
+            throw new IllegalStateException("La cuenta ya está confirmada.");
+        }
+
         Long idUser = user.getId();
+
+        // Chequear último token
+        Optional<ConfirmationToken> lastTokenOpt = confirmationTokenRepository
+                .findFirstByUser_IdOrderByCreatedDateDesc(idUser);
+        if (lastTokenOpt.isPresent()) {
+            LocalDateTime lastCreated = lastTokenOpt.get().getCreatedDate();
+            if (lastCreated.plusMinutes(1).isAfter(LocalDateTime.now())) {
+                throw new IllegalStateException("Espere un minuto antes de solicitar otro código.");
+            }
+        }
+
+        // Eliminar anteriores y generar nuevo
         confirmationTokenRepository.deleteAllByUser_Id(idUser);
         ConfirmationToken oConfirmationToken = new ConfirmationToken(user);
         confirmationTokenRepository.save(oConfirmationToken);
@@ -183,33 +225,60 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-     public List<DTOUserResponse> findAll() {
-      return  mapper.mapList(repository.findAll(), DTOUserResponse.class);
-     }
+    @Transactional
+    public boolean newCodeForChangePassword(String email) {
+        User user = repository.findByEmailIgnoreCase(email);
 
-     @Override
-     public DTOUserResponse findById(Long id) {
+        if (user == null) {
+            throw new EntityNotFoundException(USER_NOT_FOUND);
+        }
+
+        Long idUser = user.getId();
+
+        // Chequear último token
+        Optional<ConfirmationToken> lastTokenOpt = confirmationTokenRepository
+                .findFirstByUser_IdOrderByCreatedDateDesc(idUser);
+        if (lastTokenOpt.isPresent()) {
+            LocalDateTime lastCreated = lastTokenOpt.get().getCreatedDate();
+            if (lastCreated.plusMinutes(1).isAfter(LocalDateTime.now())) {
+                throw new IllegalStateException("Espere un minuto antes de solicitar otro código.");
+            }
+        }
+
+        // Eliminar anteriores y generar nuevo
+        confirmationTokenRepository.deleteAllByUser_Id(idUser);
+        ConfirmationToken oConfirmationToken = new ConfirmationToken(user);
+        confirmationTokenRepository.save(oConfirmationToken);
+
+        sendNewCodeEmail(user, oConfirmationToken);
+
+        return true;
+    }
+
+    @Override
+    public List<DTOUserResponse> findAll() {
+        return mapper.mapList(repository.findAll(), DTOUserResponse.class);
+    }
+
+    @Override
+    public DTOUserResponse findById(Long id) {
         Optional<User> optionalUser = repository.findById(id);
-        if(optionalUser.isEmpty()){
+        if (optionalUser.isEmpty()) {
             throw new EntityNotFoundException(USER_NOT_FOUND);
         }
         User user = optionalUser.get();
         ImageProfile imageProfile = imageProfileRepository.findByUserId(id).orElse(null);
-        VeterinaryInformation veterinaryInformation = veterinaryInformationRepository.findByUser(user).orElse(null);
         DTOUserResponse dtoUserResponse = mapper.mapEntityToDto(user, DTOUserResponse.class);
-        if (imageProfile != null) {
-            dtoUserResponse.setImageProfile(imageProfile.getImageData());
-        }
-        if(veterinaryInformation != null){
-            dtoUserResponse.setVeterinaryInformation(mapper.mapEntityToDto(veterinaryInformation, DTOVeterinaryInfo.class));
-        }
+         if (imageProfile != null) {
+         dtoUserResponse.setImageProfile(imageProfile.getImageData());
+         }
+         
         return dtoUserResponse;
-     }
+    }
 
-     
-     @Override
-     @Transactional
-     public DTOUserResponse updateUser(Long id, DTOUserUpdate dtoUserUpdate) {
+    @Override
+    @Transactional
+    public DTOUserResponse updateUser(Long id, DTOUserUpdate dtoUserUpdate) {
         User user = repository.findById(id).orElseThrow(() -> new EntityNotFoundException(USER_NOT_FOUND));
         user.setFirstname(dtoUserUpdate.getFirstname());
         user.setLastname(dtoUserUpdate.getLastname());
@@ -223,18 +292,20 @@ public class UserServiceImpl implements UserService {
         return mapper.mapEntityToDto(repository.save(user), DTOUserResponse.class);
     }
 
-   
-
     @Transactional
     @Override
-    public boolean confirmAccount(String confirmationToken) {
-        ConfirmationToken token = confirmationTokenRepository.findByConfirmationToken(confirmationToken).orElseThrow(
-                () -> new EntityNotFoundException(CODE_NOT_FOUND));
+    public ConfirmationResult confirmAccount(String confirmationToken) {
+        ConfirmationToken token = confirmationTokenRepository.findByConfirmationToken(confirmationToken).orElse(null);
 
-        // boolean timeTokenValidate = TimeValidation.validate(token.getCreatedDate().toString().replace(" ", "T").trim());
+        if (token == null) {
+            return ConfirmationResult.NOT_FOUND;
+        }
+        // boolean timeTokenValidate =
+        // TimeValidation.validate(token.getCreatedDate().toString().replace(" ",
+        // "T").trim());
 
         // if (!timeTokenValidate) {
-        //     return ResponseEntity.badRequest().body(CODE_EXPIRED);
+        // return ConfirmationResult.EXPIRED;
         // }
 
         User user = repository.findByEmailIgnoreCase(token.getUser().getEmail());
@@ -242,54 +313,68 @@ public class UserServiceImpl implements UserService {
         user.setPassword_expired(false);
         repository.save(user);
         confirmationTokenRepository.delete(token);
-            return true;
+        return ConfirmationResult.SUCCESS;
+    }
+
+    private List<Role> assignRoles(User user, Map<String, Boolean> flags) {
+        List<Role> roles = new ArrayList<>();
+
+        if (Boolean.TRUE.equals(flags.get("admin"))) {
+            roles.add(roleRepository.findByName("ROLE_ADMIN").orElseThrow());
+        }
+        if (Boolean.TRUE.equals(flags.get("cliente"))) {
+            roles.add(roleRepository.findByName("ROLE_CLIENT").orElseThrow());
+        }
+        if (Boolean.TRUE.equals(flags.get("veterinario"))) {
+            roles.add(roleRepository.findByName("ROLE_VETERINARY").orElseThrow());
         }
 
-
-     
-
-     
-        private List<Role> assignRoles(User user, Map<String, Boolean> flags) {
-            List<Role> roles = new ArrayList<>();
-        
-            if (Boolean.TRUE.equals(flags.get("admin"))) {
-                roles.add(roleRepository.findByName("ROLE_ADMIN").orElseThrow());
-            }
-            if (Boolean.TRUE.equals(flags.get("cliente"))) {
-                roles.add(roleRepository.findByName("ROLE_CLIENT").orElseThrow());
-            }
-            if (Boolean.TRUE.equals(flags.get("veterinario"))) {
-                roles.add(roleRepository.findByName("ROLE_VET").orElseThrow());
-            }
-        
-            if (roles.isEmpty()) {
-                // Por defecto asignamos ROLE_CLIENT
-                roles.add(roleRepository.findByName("ROLE_CLIENT").orElseThrow());
-            }
-        
-            return roles;
+        if (roles.isEmpty()) {
+            // Por defecto asignamos ROLE_CLIENT
+            roles.add(roleRepository.findByName("ROLE_CLIENT").orElseThrow());
         }
-        
+
+        return roles;
+    }
 
     private boolean isRoleClient(User user) {
         return user.getRoles().stream().anyMatch(role -> role.getName().equals(ROLE_CLIENT));
     }
 
-    private void sendConfirmationEmail(User user, ConfirmationToken token, String passwordRaw) {
+    private void sendConfirmationEmail(User user, ConfirmationToken token) {
         String codigo = token.getConfirmationToken();
         String to = user.getEmail();
-        String subject = CONFIRMATION_EMAIL_SUBJECT;
+        String subject = "Lawn Tennis APP Confirma tu cuenta ";
 
-        String text = String.format("Hola %s, confirma tu cuenta ingresando el siguiente codigo: %s \n <a href=http://localhost:3000/app/auth/confirm-account>Has click aqui</a>", user.getFirstname(),codigo);
-
-        if (isRoleClient(user) == false) {
-            text = "";
-            text = String.format(
-                    "Hola %s, tu contraseña es %s recuerda cambiarla.",
-                    user.getFirstname(), passwordRaw);
-        }
-
-        emailService.sendSimpleMessage(to, subject, text);
+        String htmlContent = String.format(
+                "<!DOCTYPE html>" +
+                        "<html>" +
+                        "<head>" +
+                        "  <meta charset='UTF-8'>" +
+                        "  <style>" +
+                        "    body { font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px; }" +
+                        "    .container { background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }"
+                        +
+                        "    .title { font-size: 20px; font-weight: bold; color: #333333; }" +
+                        "    .code { font-size: 18px; font-weight: bold; color: #2d89ef; margin: 15px 0; }" +
+                        "    .btn { display: inline-block; padding: 10px 20px; font-size: 16px; background-color: #2d89ef; color: #ffffff; text-decoration: none; border-radius: 5px; }"
+                        +
+                        "    .footer { font-size: 12px; color: #888888; margin-top: 20px; }" +
+                        "  </style>" +
+                        "</head>" +
+                        "<body>" +
+                        "  <div class='container'>" +
+                        "    <p class='title'>Hola %s,</p>" +
+                        "    <p>Gracias por registrarte en <b>Lawn Tennis APP</b>. Para activar tu cuenta, utiliza el siguiente código de verificación:</p>"
+                        +
+                        "    <p class='code'>%s</p>" +
+                        "    <p class='footer'>Si no solicitaste esta cuenta, puedes ignorar este mensaje.</p>" +
+                        "  </div>" +
+                        "</body>" +
+                        "</html>",
+                user.getFirstname(),
+                codigo);
+        emailService.sendHtmlMessage(to, subject, htmlContent);
     }
 
     private void sendResetPasswordEmail(User user, ConfirmationToken token) {
@@ -306,7 +391,8 @@ public class UserServiceImpl implements UserService {
         String codigo = token.getConfirmationToken();
         String to = user.getEmail();
         String subject = NEW_CODE_EMAIL_SUBJECT;
-        String text = String.format("Hola %s, confirma tu cuenta ingresando el siguiente codigo: %s", user.getFirstname(),
+        String text = String.format("Hola %s, confirma tu cuenta ingresando el siguiente codigo: %s",
+                user.getFirstname(),
                 codigo);
 
         emailService.sendSimpleMessage(to, subject, text);

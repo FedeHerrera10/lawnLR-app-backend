@@ -14,44 +14,57 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOImageUpload;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOUserCreate;
 import com.fedeherrera.vetapp.vetapp.dtos.request.DTOUserUpdate;
-import com.fedeherrera.vetapp.vetapp.entities.User;
+import com.fedeherrera.vetapp.vetapp.dtos.response.DTOUserResponse;
 import com.fedeherrera.vetapp.vetapp.services.imageProfile.ImageProfileService;
 import com.fedeherrera.vetapp.vetapp.services.user.UserService;
-import com.fedeherrera.vetapp.vetapp.utils.MapperUtil;
+import com.fedeherrera.vetapp.vetapp.exceptions.EntityExistException;
 
 import jakarta.validation.Valid;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
 
-    
     @Autowired
     private UserService service;
-    
-    @Autowired
-    private MapperUtil mapper;
 
     @Autowired
     private ImageProfileService imageProfileService;
-    
+
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody DTOUserCreate user) {
-        
-        User userToSave = mapper.mapEntityToDto(user, User.class);
-        if(service.existsByUsername(user.getUsername())) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El usuario ya existe en el sistema.");
-        if(service.existsByEmail(user.getEmail())) return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya existe en el sistema.");
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.save(userToSave));
+        if (service.existsByUsername(user.getUsername()))
+            throw new EntityExistException("El usuario ya existe en el sistema.");
+        if (service.existsByEmail(user.getEmail()))
+            throw new EntityExistException("El email ya existe en el sistema.");
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.save(user));
     }
 
+    @Operation(summary = "Crear usuario", description = "Crea un nuevo usuario en el sistema.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Usuario creado con éxito", content = @Content(schema = @Schema(implementation = String.class))),
+            @ApiResponse(responseCode = "400", description = "Usuario o email ya existentes en el sistema"),
+            @ApiResponse(responseCode = "500", description = "Error inesperado")
+    })
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody DTOUserCreate user) {
         return create(user);
     }
 
+    @Operation(summary = "Obtener usuario actual", description = "Obtiene el usuario actualmente autenticado.")
     @GetMapping("/")
     public ResponseEntity<?> me() {
-        return ResponseEntity.ok(service.getUserLogged());
+        DTOUserResponse user = service.getUserLogged();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(user);
     }
 
     @GetMapping("/list")
@@ -69,7 +82,7 @@ public class UserController {
         return ResponseEntity.ok(service.updateUser(id, user));
     }
 
-     @PostMapping("/upload-image")
+    @PostMapping("/upload-image")
     public ResponseEntity<?> uploadImage(@RequestBody DTOImageUpload imageRequest) {
         imageProfileService.saveImage(imageRequest.getUserId(), imageRequest.getImageBase64());
         return ResponseEntity.ok("Imagen guardada exitosamente");

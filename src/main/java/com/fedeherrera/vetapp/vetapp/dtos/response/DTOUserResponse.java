@@ -3,7 +3,6 @@ package com.fedeherrera.vetapp.vetapp.dtos.response;
 import java.time.LocalDateTime;
 import java.util.Set;
 
-import com.fedeherrera.vetapp.vetapp.entities.Role; 
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -20,13 +19,11 @@ public class DTOUserResponse {
     private String username;
     private String email;
     private boolean enabled;
-    private boolean admin;
-    private boolean cliente;
-    private boolean veterinario;
     private boolean password_expired;
-    private Set<Role> roles;
-    private LocalDateTime created_at;
-    private LocalDateTime updated_at;
-    private String imageProfile;
-    private DTOVeterinaryInfo veterinaryInformation;
+    private Set<DTORole> roles;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // private LocalDateTime updated_at;
+     private String imageProfile;
 }

@@ -16,6 +16,10 @@ import jakarta.transaction.Transactional;
 public interface ConfirmationTokenRepository extends JpaRepository<ConfirmationToken, Long> {
    Optional<ConfirmationToken> findByConfirmationToken(String confirmationToken);
 
+  // Devuelve el último token generado de un usuario
+  Optional<ConfirmationToken> findFirstByUser_IdOrderByCreatedDateDesc(Long userId);
+
+
   @Modifying
     @Transactional
     @Query("DELETE FROM ConfirmationToken t WHERE t.user.id = :userId")
