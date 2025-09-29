@@ -60,6 +60,7 @@ public class SpringSecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/auth/reset-password/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/new-code/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/new-code-for-change-password/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/habilitaciones").permitAll()
                 .anyRequest().authenticated())
                 .addFilter(new JwtAuthenticationFilter(authenticationManager() , userRepository))
                 .addFilter(new JwtValidationFilter(authenticationManager()))
