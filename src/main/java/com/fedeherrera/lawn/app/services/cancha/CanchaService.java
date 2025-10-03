@@ -9,6 +9,7 @@ import com.fedeherrera.lawn.app.repositories.DisponibilidadRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -99,6 +100,9 @@ public class CanchaService {
         return disponibilidadRepository.save(disp);
     }
     
+    public List<Cancha> obtenerDisponibilidadPorFecha(LocalDate fecha) {
+        return canchaRepository.findCanchasConDisponibilidadesPorFecha(fecha);
+    }
     
 }
 

@@ -10,6 +10,4 @@ import java.util.Optional;
 public interface DisponibilidadRepository extends JpaRepository<DisponibilidadCancha, Long> {
     Optional<DisponibilidadCancha> findByCanchaIdAndFecha(Long canchaId, LocalDate fecha);
     List<DisponibilidadCancha> findByCanchaIdAndFechaBetween(Long canchaId, LocalDate desde, LocalDate hasta);
-
-    
 }

@@ -7,6 +7,7 @@ import com.fedeherrera.lawn.app.entities.DisponibilidadCancha;
 import com.fedeherrera.lawn.app.services.cancha.CanchaService;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class CanchaController {
 
+       
     private final CanchaService canchaService;
 
     @PostMapping
@@ -55,6 +57,14 @@ public class CanchaController {
             @PathVariable Long id,
             @RequestBody HorarioRequest request) {
         return ResponseEntity.ok(canchaService.liberarHorarios(id, request));
+    }
+
+    @GetMapping("/obtenerTodasLasCanchasPorFecha")
+    public ResponseEntity<List<Cancha>> obtenerDisponibilidadesPorFecha(
+            @RequestParam String fecha
+    ) {
+        LocalDate f = LocalDate.parse(fecha);
+        return ResponseEntity.ok(canchaService.obtenerDisponibilidadPorFecha(f));
     }
 
 }

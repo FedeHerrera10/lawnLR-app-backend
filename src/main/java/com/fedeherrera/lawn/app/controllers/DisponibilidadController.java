@@ -50,4 +50,6 @@ public class DisponibilidadController {
         List<DisponibilidadCancha> lista = disponibilidadService.obtenerDisponibilidadesPorRango(canchaId, fDesde, fHasta);
         return ResponseEntity.ok(lista);
     }
+
+    
 }

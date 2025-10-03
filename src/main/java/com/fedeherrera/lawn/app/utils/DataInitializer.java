@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component;
 
 import com.fedeherrera.lawn.app.entities.Role;
 import com.fedeherrera.lawn.app.entities.User;
+import com.fedeherrera.lawn.app.entities.Cancha;
 import com.fedeherrera.lawn.app.repositories.UserRepository;
+import com.fedeherrera.lawn.app.repositories.CanchaRepository;
 import com.fedeherrera.lawn.app.services.role.RoleService;
 @Component
 public class DataInitializer implements CommandLineRunner{
@@ -22,6 +24,9 @@ public class DataInitializer implements CommandLineRunner{
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private CanchaRepository canchaRepository;
 
 
     @Override
@@ -37,6 +42,7 @@ public class DataInitializer implements CommandLineRunner{
         roleService.saveRole(userRole);
 
         initUsers();
+        initCanchas();
     }
 
     private void initUsers() {
@@ -68,5 +74,17 @@ public class DataInitializer implements CommandLineRunner{
         userRepository.save(clientUser);
     }
 
-    
+    private void initCanchas() {
+        Cancha cancha = new Cancha();
+        cancha.setNombre("Cancha 1");
+        canchaRepository.save(cancha);
+
+        Cancha cancha2 = new Cancha();
+        cancha2.setNombre("Cancha 2");
+        canchaRepository.save(cancha2);
+
+        Cancha cancha3 = new Cancha();
+        cancha3.setNombre("Cancha 3");
+        canchaRepository.save(cancha3);
+    }    
 }   

@@ -38,4 +38,6 @@ public class DisponibilidadService {
     public List<DisponibilidadCancha> obtenerDisponibilidadesPorRango(Long canchaId, LocalDate desde, LocalDate hasta) {
         return disponibilidadCanchaRepository.findByCanchaIdAndFechaBetween(canchaId, desde, hasta);
     }
+    
+   
 }
