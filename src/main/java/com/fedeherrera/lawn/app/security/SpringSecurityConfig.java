@@ -61,6 +61,8 @@ public class SpringSecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/new-code/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/new-code-for-change-password/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/habilitaciones").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/reservas").permitAll()
+                .requestMatchers("/api/pagos/**").permitAll() // 👈 habilitar pagos
                 .anyRequest().authenticated())
                 .addFilter(new JwtAuthenticationFilter(authenticationManager() , userRepository))
                 .addFilter(new JwtValidationFilter(authenticationManager()))
