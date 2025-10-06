@@ -70,7 +70,7 @@ public class HabilitacionService {
             }
 
             // --- 2. Marcar horarios ocupados por profesores según el día ---
-            List<String> horariosOcupados = new ArrayList<>();
+            List<String> horariosBloqueados = new ArrayList<>();
             if (habilitacion.getHorariosProfesores() != null) {
                 DayOfWeek day = date.getDayOfWeek();
                 habilitacion.getHorariosProfesores().stream()
@@ -78,7 +78,7 @@ public class HabilitacionService {
                         .forEach(hp -> {
                             LocalTime t = hp.getHoraInicio();
                             while (!t.isAfter(hp.getHoraFin())) {
-                                horariosOcupados.add(t.toString());
+                                horariosBloqueados.add(t.toString());
                                 t = t.plusHours(1);
                             }
                         });
@@ -86,15 +86,15 @@ public class HabilitacionService {
 
             // --- 3. El resto son horarios disponibles ---
             List<String> horariosDisponibles = todosLosHorarios.stream()
-                    .filter(h -> !horariosOcupados.contains(h))
+                    .filter(h -> !horariosBloqueados.contains(h))
                     .toList();
 
             DisponibilidadCancha disp = new DisponibilidadCancha();
             disp.setCancha(cancha);
             disp.setFecha(date);
             disp.setHorariosDisponibles(new ArrayList<>(horariosDisponibles));
-            disp.setHorariosOcupados(new ArrayList<>(horariosOcupados));
-            disp.setHorariosBloqueados(new ArrayList<>());
+            disp.setHorariosOcupados(new ArrayList<>());
+            disp.setHorariosBloqueados(new ArrayList<>(horariosBloqueados));
 
             disponibilidadCanchaRepository.save(disp);
         }
