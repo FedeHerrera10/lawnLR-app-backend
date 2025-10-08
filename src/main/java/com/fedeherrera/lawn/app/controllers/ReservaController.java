@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,7 +16,11 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ReservaController {
 
-    private final ReservaService reservaService;
+    @Autowired
+    private  ReservaService reservaService;
+    
+    @Autowired
+    private  PrecioService precioService;
 
     @PostMapping
     public ResponseEntity<ReservaResponseDTO> crearReserva(@RequestBody ReservaRequestDTO request) {
@@ -23,14 +28,21 @@ public class ReservaController {
     }
 
     // ReservaController.java
-@GetMapping("/usuario/{id}")
-public List<ReservaResponseDTO> getReservasUsuario(@PathVariable Long id) {
-return reservaService.getReservasUsuario(id);
-}
+    @GetMapping("/usuario/{id}")
+    public List<ReservaResponseDTO> getReservasUsuario(@PathVariable Long id) {
+        return reservaService.getReservasUsuario(id);
+    }
 
-@GetMapping
-public List<ReservaResponseDTO> getAllReservas() {
-    return reservaService.getAllReservas();
-}
+    @GetMapping
+    public List<ReservaResponseDTO> getAllReservas() {
+        return reservaService.getAllReservas();
+    }
+
+    
+    @PostMapping("/calcular-precios")
+    public ResponseEntity<CalculoPrecioResponseDTO> calcularPrecios(@RequestBody CalculoPrecioRequestDTO request) {
+        return ResponseEntity.ok(precioService.calcularPrecios(request));
+    }
+    
 
 }

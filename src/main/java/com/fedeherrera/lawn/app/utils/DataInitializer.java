@@ -8,10 +8,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import com.fedeherrera.lawn.app.entities.Role;
+import com.fedeherrera.lawn.app.entities.Socios;
 import com.fedeherrera.lawn.app.entities.User;
 import com.fedeherrera.lawn.app.entities.Cancha;
+import com.fedeherrera.lawn.app.entities.Categoria;
 import com.fedeherrera.lawn.app.repositories.UserRepository;
 import com.fedeherrera.lawn.app.repositories.CanchaRepository;
+import com.fedeherrera.lawn.app.repositories.CategoriaRepository;
+import com.fedeherrera.lawn.app.repositories.SocioRepository;
 import com.fedeherrera.lawn.app.services.role.RoleService;
 @Component
 public class DataInitializer implements CommandLineRunner{
@@ -28,6 +32,11 @@ public class DataInitializer implements CommandLineRunner{
     @Autowired
     private CanchaRepository canchaRepository;
 
+    @Autowired
+    private CategoriaRepository categoriaRepository;
+
+    @Autowired
+    private SocioRepository socioRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -43,6 +52,8 @@ public class DataInitializer implements CommandLineRunner{
 
         initUsers();
         initCanchas();
+        initCategoria();
+        initSocios();
     }
 
     private void initUsers() {
@@ -86,5 +97,40 @@ public class DataInitializer implements CommandLineRunner{
         Cancha cancha3 = new Cancha();
         cancha3.setNombre("Cancha 3");
         canchaRepository.save(cancha3);
-    }    
+    }
+    
+    private void initCategoria(){
+        Categoria categoria = new Categoria();
+        categoria.setNombre("Socio Lawn Tennis");
+        categoria.setPrecio(3000.00);
+        categoriaRepository.save(categoria);
+
+        Categoria categoriaEscuela = new Categoria();
+        categoriaEscuela.setNombre("Socio Escuela");
+        categoriaEscuela.setPrecio(2500.00);
+        categoriaRepository.save(categoriaEscuela);
+
+        Categoria categoriaLiberado = new Categoria();
+        categoriaLiberado.setNombre("Socio Liberado");
+        categoriaLiberado.setPrecio(0.0);
+        categoriaRepository.save(categoriaLiberado);
+
+    }
+
+    private void initSocios(){
+        Socios socio = new Socios();
+        socio.setDni("37319074");
+        socio.setCategoriaSocio(categoriaRepository.findByNombre("Socio Lawn Tennis"));
+        socioRepository.save(socio);
+
+        Socios socioEscuela = new Socios();
+        socioEscuela.setDni("39701391");
+        socioEscuela.setCategoriaSocio(categoriaRepository.findByNombre("Socio Escuela"));
+        socioRepository.save(socio);
+
+        Socios socioLiberado = new Socios();
+        socioLiberado.setDni("28348945");
+        socioLiberado.setCategoriaSocio(categoriaRepository.findByNombre("Socio Liberado"));
+        socioRepository.save(socio);
+    }
 }   
